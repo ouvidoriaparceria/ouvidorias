@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Ouvidorias — Parcerias SES/DF</title>
+
+<!-- Bibliotecas externas (via CDN, sem necessidade de instalação) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<style>
+  /* ===== Identidade visual: tema claro e sóbrio, saúde pública ===== */
+  :root{
+    --azul-escuro:#1B4F72;
+    --azul-medio:#2E6DA4;
+    --verde:#1F7A4D;
+    --vermelho:#C00000;
+    --amarelo:#E8A33D;
+    --cinza:#7F7F7F;
+    --fundo:#F4F6F8;
+    --fundo-card:#FFFFFF;
+    --borda:#D9E0E6;
+    --texto:#1F2A33;
+    --texto-suave:#5B6B75;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI", Arial, sans-serif;
+    background:var(--fundo);
+    color:var(--texto);
+  }
+  header.topo{
+    background:var(--azul-escuro);
+    color:#fff;
+    padding:16px 24px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .linha-superior-titulo{
+    font-size:0.75rem;
+    font-weight:700;
+    letter-spacing:1px;
+    color:#B5C7D6;
+    margin-bottom:2px;
+  }
+  header.topo h1{
+    font-size:1.25rem;
+    margin:0;
+    letter-spacing:0.5px;
+  }
+  .info-atualizacao{
+    font-size:0.8rem;
+    color:#DCE7F0;
+    text-align:right;
+  }
+  .barra-acoes{
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  button{
+    cursor:pointer;
+    border:none;
+    border-radius:6px;
+    padding:8px 14px;
+    font-size:0.85rem;
+    font-weight:600;
+    background:var(--azul-medio);
+    color:#fff;
+    transition:opacity .15s;
+  }
+  button:hover{opacity:0.85;}
+  button.secundario{
+    background:#fff;
+    color:var(--azul-escuro);
+    border:1px solid #fff;
+  }
+
+  .layout{
+    display:flex;
+    align-items:flex-start;
+  }
+
+  /* ===== Barra lateral de filtros, fixa ===== */
+  aside.filtros{
+    width:260px;
+    min-width:260px;
+    background:var(--fundo-card);
+    border-right:1px solid var(--borda);
+    padding:16px;
+    position:sticky;
+    top:0;
+    height:100vh;
+    overflow-y:auto;
+  }
+  aside.filtros h2{
+    font-size:0.95rem;
+    color:var(--azul-escuro);
+    margin:0 0 12px 0;
+  }
+  .grupo-filtro{
+    margin-bottom:18px;
+  }
+  .grupo-filtro label.titulo-filtro{
+    display:block;
+    font-size:0.8rem;
+    font-weight:700;
+    color:var(--texto-suave);
+    margin-bottom:6px;
+    text-transform:uppercase;
+  }
+  select[multiple]{
+    width:100%;
+    min-height:100px;
+    border:1px solid var(--borda);
+    border-radius:6px;
+    padding:4px;
+    font-size:0.82rem;
+  }
+  /* Unidade recebe ~28% mais altura para caber mais opções sem rolar tanto */
+  #filtroUnidade{
+    min-height:128px;
+  }
+  #btnLimparFiltros{
+    width:100%;
+    background:var(--vermelho);
+  }
+
+  main{
+    flex:1;
+    padding:20px 24px;
+    min-width:0;
+  }
+
+  /* ===== Cards de indicadores ===== */
+  .cards{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+    margin-bottom:22px;
+  }
+  .card{
+    background:var(--fundo-card);
+    border:1px solid var(--borda);
+    border-left:5px solid var(--azul-medio);
+    border-radius:8px;
+    padding:14px 16px;
+  }
+  .card h3{
+    margin:0 0 6px 0;
+    font-size:0.78rem;
+    text-transform:uppercase;
+    color:var(--texto-suave);
+    font-weight:700;
+  }
+  .card .valor{
+    font-size:1.8rem;
+    font-weight:700;
+    color:var(--azul-escuro);
+  }
+  .card.respondidas{border-left-color:var(--verde);}
+  .card.atrasadas{border-left-color:var(--vermelho);}
+  .card.pendentes{border-left-color:var(--amarelo);}
+
+  /* ===== Gráficos 2x2 ===== */
+  .graficos{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-bottom:24px;
+  }
+  .painel-grafico{
+    background:var(--fundo-card);
+    border:1px solid var(--borda);
+    border-radius:8px;
+    padding:12px;
+  }
+  .painel-grafico h3{
+    font-size:0.85rem;
+    margin:4px 0 10px 6px;
+    color:var(--azul-escuro);
+  }
+  .painel-grafico .caixa-canvas{
+    position:relative;
+    height:280px;
+  }
+
+  /* ===== Tabela detalhada ===== */
+  .secao-tabela{
+    background:var(--fundo-card);
+    border:1px solid var(--borda);
+    border-radius:8px;
+    padding:14px;
+  }
+  .cabecalho-tabela{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  #buscaLivre{
+    padding:8px 10px;
+    border:1px solid var(--borda);
+    border-radius:6px;
+    width:280px;
+    max-width:100%;
+    font-size:0.85rem;
+  }
+  .wrapper-tabela{
+    overflow-x:auto;
+    max-height:520px;
+    overflow-y:auto;
+  }
+  table{
+    border-collapse:collapse;
+    width:100%;
+    font-size:0.78rem;
+  }
+  thead th{
+    position:sticky;
+    top:0;
+    background:var(--azul-escuro);
+    color:#fff;
+    padding:8px 10px;
+    text-align:left;
+    white-space:nowrap;
+    cursor:pointer;
+    user-select:none;
+  }
+  thead th:hover{background:var(--azul-medio);}
+  tbody td{
+    padding:6px 10px;
+    border-bottom:1px solid var(--borda);
+    white-space:nowrap;
+  }
+  tbody tr:nth-child(even){background:#FAFBFC;}
+  .selo-status{
+    padding:2px 8px;
+    border-radius:10px;
+    color:#fff;
+    font-size:0.72rem;
+    font-weight:600;
+  }
+  .contador-linhas{
+    font-size:0.78rem;
+    color:var(--texto-suave);
+  }
+
+  /* ===== Estados de carregamento / erro ===== */
+  #estadoCarregamento, #estadoErro{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--texto-suave);
+  }
+  #estadoErro{
+    color:var(--vermelho);
+    display:none;
+  }
+  #estadoErro button{
+    margin-top:12px;
+  }
+  #conteudo{display:none;}
+
+  .aviso-cache{
+    font-size:0.72rem;
+    color:#B5C7D6;
+    margin-top:2px;
+  }
+
+  @media (max-width:900px){
+    .layout{flex-direction:column;}
+    aside.filtros{
+      width:100%;
+      min-width:0;
+      height:auto;
+      position:relative;
+      border-right:none;
+      border-bottom:1px solid var(--borda);
+    }
+    .cards{grid-template-columns:1fr 1fr;}
+    .graficos{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<header class="topo">
+  <div>
+    <div class="linha-superior-titulo">SUCONV/DIMACP/GEMAC</div>
+    <h1>PAINEL DE OUVIDORIAS — PARCERIAS SES/DF</h1>
+    <div class="info-atualizacao">
+      <span id="horaAtualizacao">Carregando dados…</span>
+      <div class="aviso-cache">Alterações recentes na planilha podem levar alguns minutos para refletir aqui.</div>
+    </div>
+  </div>
+  <div class="barra-acoes">
+    <button id="btnAtualizar" class="secundario">↻ Atualizar dados</button>
+  </div>
+</header>
+
+<div id="estadoCarregamento">Carregando dados da planilha, aguarde…</div>
+
+<div id="estadoErro">
+  <p>Não foi possível carregar os dados da planilha agora.</p>
+  <p id="mensagemErro" style="font-size:0.85rem;"></p>
+  <button id="btnTentarNovamente">Tentar novamente</button>
+</div>
+
+<div class="layout" id="conteudo">
+
+  <!-- ===== Barra lateral de filtros ===== -->
+  <aside class="filtros">
+    <h2>Filtros</h2>
+
+    <div class="grupo-filtro">
+      <label class="titulo-filtro">Instituto</label>
+      <select multiple id="filtroInstituto"></select>
+    </div>
+
+    <div class="grupo-filtro">
+      <label class="titulo-filtro">Unidade</label>
+      <select multiple id="filtroUnidade"></select>
+    </div>
+
+    <div class="grupo-filtro">
+      <label class="titulo-filtro">Categoria</label>
+      <select multiple id="filtroCategoria"></select>
+    </div>
+
+    <div class="grupo-filtro">
+      <label class="titulo-filtro">Status</label>
+      <select multiple id="filtroStatus"></select>
+    </div>
+
+    <div class="grupo-filtro">
+      <label class="titulo-filtro">Mês</label>
+      <select multiple id="filtroMes"></select>
+    </div>
+
+    <div class="grupo-filtro">
+      <label class="titulo-filtro">Trimestre</label>
+      <select multiple id="filtroTrimestre"></select>
+    </div>
+
+    <button id="btnLimparFiltros">Limpar filtros</button>
+  </aside>
+
+  <main>
+    <!-- ===== Cards de indicadores ===== -->
+    <section class="cards">
+      <div class="card">
+        <h3>Total de manifestações</h3>
+        <div class="valor" id="cardTotal">0</div>
+      </div>
+      <div class="card respondidas">
+        <h3>Respondidas</h3>
+        <div class="valor" id="cardRespondidas">0</div>
+      </div>
+      <div class="card atrasadas">
+        <h3>Atrasadas (prazo vencido)</h3>
+        <div class="valor" id="cardAtrasadas">0</div>
+      </div>
+      <div class="card pendentes">
+        <h3>Pendentes</h3>
+        <div class="valor" id="cardPendentes">0</div>
+      </div>
+    </section>
+
+    <!-- ===== Gráficos 2x2 ===== -->
+    <section class="graficos">
+      <div class="painel-grafico">
+        <h3>Manifestações por Instituto</h3>
+        <div class="caixa-canvas"><canvas id="graficoInstituto"></canvas></div>
+      </div>
+      <div class="painel-grafico">
+        <h3>Problemas mais frequentes (Categoria)</h3>
+        <div class="caixa-canvas"><canvas id="graficoCategoria"></canvas></div>
+      </div>
+      <div class="painel-grafico">
+        <h3>Reclamações por Unidade</h3>
+        <div class="caixa-canvas"><canvas id="graficoUnidade"></canvas></div>
+      </div>
+      <div class="painel-grafico">
+        <h3>Situação (Status)</h3>
+        <div class="caixa-canvas"><canvas id="graficoStatus"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ===== Tabela detalhada ===== -->
+    <section class="secao-tabela">
+      <div class="cabecalho-tabela">
+        <input type="text" id="buscaLivre" placeholder="Buscar em todos os campos…">
+        <div class="barra-acoes">
+          <span class="contador-linhas" id="contadorLinhas"></span>
+          <button id="btnExportarCsv" class="secundario" style="background:var(--verde);color:#fff;">⬇ Exportar CSV</button>
+        </div>
+      </div>
+      <div class="wrapper-tabela">
+        <table id="tabelaDados">
+          <thead>
+            <tr id="linhaCabecalhoTabela"></tr>
+          </thead>
+          <tbody id="corpoTabela"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   PAINEL DE OUVIDORIAS — PARCERIAS SES/DF
+   Dashboard estático de página única, sem build e sem framework.
+   ===================================================================== */
+
+// --------- URL da planilha publicada em CSV (troque aqui se precisar) ---------
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR21bwgCkXSLFz0920vhBu0HNvySQhjYQfG-1HxUMRjvTOt7s7P8vw7xbnHmKAr_A/pub?gid=2116776245&single=true&output=csv";
+
+// Colunas exibidas na tabela detalhada, na ordem desejada
+const COLUNAS_TABELA = [
+  "Nº Ouvidoria","Data Recebimento","Instituto","Parceria","Processo SEI",
+  "Unidade","Tipo Manifestação","Categoria","Prazo","Dt. Resposta",
+  "Dt. Retorno SUCONV/DIMACP","Status","Plano de Ação","Observações"
+];
+
+// Cores fixas por status, usadas no gráfico de Situação e nos selos da tabela
+const CORES_STATUS = {
+  "Respondido": "#1F7A4D",
+  "Prazo vencido": "#C00000",
+  "Aguarda Resposta": "#E8A33D",
+  "Não iniciado (sem prazo)": "#7F7F7F"
+};
+
+// Estado global em memória
+let dadosBrutos = [];   // linhas cruas vindas do CSV, já com campos calculados
+let graficos = {};      // instâncias do Chart.js, para poder destruir/recriar
+let ordenacaoAtual = { coluna: null, crescente: true };
+
+// --------- Elementos do DOM usados com frequência ---------
+const elCarregamento = document.getElementById("estadoCarregamento");
+const elErro = document.getElementById("estadoErro");
+const elConteudo = document.getElementById("conteudo");
+const elMensagemErro = document.getElementById("mensagemErro");
+const elHoraAtualizacao = document.getElementById("horaAtualizacao");
+
+document.getElementById("btnAtualizar").addEventListener("click", carregarDados);
+document.getElementById("btnTentarNovamente").addEventListener("click", carregarDados);
+document.getElementById("btnLimparFiltros").addEventListener("click", limparFiltros);
+document.getElementById("btnExportarCsv").addEventListener("click", exportarCsv);
+document.getElementById("buscaLivre").addEventListener("input", aplicarFiltrosERenderizar);
+
+["filtroInstituto","filtroUnidade","filtroCategoria","filtroStatus","filtroMes","filtroTrimestre"]
+  .forEach(id => document.getElementById(id).addEventListener("change", aplicarFiltrosERenderizar));
+
+// Carrega os dados assim que a página abre
+carregarDados();
+
+/* =====================================================================
+   CARREGAMENTO E PARSE DO CSV
+   ===================================================================== */
+function carregarDados(){
+  mostrarCarregamento();
+
+  // Parâmetro variável para forçar o Google a não servir uma versão em cache
+  const urlSemCache = `${CSV_URL}&_=${Date.now()}`;
+
+  fetch(urlSemCache, { cache: "no-store" })
+    .then(resposta => {
+      if(!resposta.ok){
+        throw new Error(`A planilha respondeu com erro HTTP ${resposta.status}.`);
+      }
+      return resposta.text();
+    })
+    .then(textoCsv => {
+      const resultado = Papa.parse(textoCsv, {
+        header: true,
+        skipEmptyLines: true
+      });
+      if(resultado.errors && resultado.errors.length > 0){
+        console.warn("Avisos ao interpretar o CSV:", resultado.errors);
+      }
+      dadosBrutos = resultado.data.map(calcularCamposDerivados);
+      montarFiltros(dadosBrutos);
+      aplicarFiltrosERenderizar();
+      registrarHoraAtualizacao();
+      mostrarConteudo();
+    })
+    .catch(erro => {
+      console.error("Falha ao carregar a planilha:", erro);
+      mostrarErro(erro.message);
+    });
+}
+
+// Converte uma data no formato M/D/AAAA (como o Google exporta) para um objeto Date.
+// Retorna null se a célula estiver vazia ou em formato inválido.
+function converterDataPlanilha(texto){
+  if(!texto) return null;
+  texto = texto.trim();
+  if(texto === "") return null;
+
+  // Formato mais comum vindo do Google Sheets: M/D/AAAA
+  const partes = texto.split("/");
+  if(partes.length === 3){
+    const mes = parseInt(partes[0], 10);
+    const dia = parseInt(partes[1], 10);
+    const ano = parseInt(partes[2], 10);
+    if(!isNaN(mes) && !isNaN(dia) && !isNaN(ano)){
+      return new Date(ano, mes - 1, dia);
+    }
+  }
+
+  // Formato alternativo AAAA-MM-DD, caso a planilha mude no futuro
+  const partesIso = texto.split("-");
+  if(partesIso.length === 3){
+    const ano = parseInt(partesIso[0], 10);
+    const mes = parseInt(partesIso[1], 10);
+    const dia = parseInt(partesIso[2], 10);
+    if(!isNaN(mes) && !isNaN(dia) && !isNaN(ano)){
+      return new Date(ano, mes - 1, dia);
+    }
+  }
+  return null;
+}
+
+// Formata um objeto Date de volta para AAAA-MM-DD, para exibição
+function formatarDataIso(data){
+  if(!data) return "";
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+// Calcula Status, Mês e Trimestre para uma linha, a partir das datas brutas
+function calcularCamposDerivados(linha){
+  const dataRecebimento = converterDataPlanilha(linha["Data Recebimento"]);
+  const dataPrazo = converterDataPlanilha(linha["Prazo"]);
+  const dataResposta = converterDataPlanilha(linha["Dt. Resposta"]);
+
+  const hoje = new Date();
+  hoje.setHours(0,0,0,0);
+
+  let status;
+  if(dataResposta){
+    status = "Respondido";
+  } else if(dataPrazo){
+    status = (dataPrazo < hoje) ? "Prazo vencido" : "Aguarda Resposta";
+  } else {
+    status = "Não iniciado (sem prazo)";
+  }
+
+  let mes = "";
+  let trimestre = "";
+  if(dataRecebimento){
+    mes = `${dataRecebimento.getFullYear()}-${String(dataRecebimento.getMonth()+1).padStart(2,"0")}`;
+    const numeroTrimestre = Math.floor(dataRecebimento.getMonth() / 3) + 1;
+    trimestre = `T${numeroTrimestre}/${dataRecebimento.getFullYear()}`;
+  }
+
+  // Reescreve as datas em formato AAAA-MM-DD para exibição amigável na tabela
+  return {
+    ...linha,
+    "Data Recebimento": formatarDataIso(dataRecebimento),
+    "Prazo": formatarDataIso(dataPrazo),
+    "Dt. Resposta": formatarDataIso(dataResposta),
+    "Dt. Retorno SUCONV/DIMACP": formatarDataIso(converterDataPlanilha(linha["Dt. Retorno SUCONV/DIMACP"])),
+    "Status": status,
+    "_mes": mes,
+    "_trimestre": trimestre,
+    "_trimestreOrdenacao": dataRecebimento ? (dataRecebimento.getFullYear() * 10 + Math.floor(dataRecebimento.getMonth()/3)) : -1
+  };
+}
+
+function registrarHoraAtualizacao(){
+  const agora = new Date();
+  const hh = String(agora.getHours()).padStart(2,"0");
+  const mm = String(agora.getMinutes()).padStart(2,"0");
+  elHoraAtualizacao.textContent = `Dados atualizados às ${hh}:${mm}`;
+}
+
+function mostrarCarregamento(){
+  elCarregamento.style.display = "block";
+  elErro.style.display = "none";
+  elConteudo.style.display = "none";
+}
+function mostrarErro(mensagem){
+  elCarregamento.style.display = "none";
+  elErro.style.display = "block";
+  elConteudo.style.display = "none";
+  elMensagemErro.textContent = mensagem || "Verifique sua conexão com a internet e tente novamente.";
+}
+function mostrarConteudo(){
+  elCarregamento.style.display = "none";
+  elErro.style.display = "none";
+  elConteudo.style.display = "flex";
+}
+
+/* =====================================================================
+   FILTROS (montagem dinâmica das opções + aplicação)
+   ===================================================================== */
+function valoresUnicos(lista, campo){
+  const conjunto = new Set();
+  lista.forEach(linha => {
+    const valor = (linha[campo] || "").toString().trim();
+    if(valor !== "") conjunto.add(valor);
+  });
+  return Array.from(conjunto).sort((a,b) => a.localeCompare(b, "pt-BR"));
+}
+
+function montarFiltros(lista){
+  preencherSelect("filtroInstituto", valoresUnicos(lista, "Instituto"));
+  preencherSelect("filtroUnidade", valoresUnicos(lista, "Unidade"));
+  preencherSelect("filtroCategoria", valoresUnicos(lista, "Categoria"));
+  preencherSelect("filtroStatus", valoresUnicos(lista, "Status"));
+
+  // Mês é ordenado cronologicamente (o formato AAAA-MM já ordena certo como texto)
+  const mesesUnicos = Array.from(new Set(lista.map(l => l._mes).filter(Boolean))).sort();
+  preencherSelect("filtroMes", mesesUnicos);
+
+  // Trimestre é ordenado cronologicamente, não em ordem alfabética
+  const trimestresUnicos = Array.from(new Set(lista.map(l => l._trimestre).filter(Boolean)));
+  trimestresUnicos.sort((a,b) => {
+    const linhaA = lista.find(l => l._trimestre === a);
+    const linhaB = lista.find(l => l._trimestre === b);
+    return linhaA._trimestreOrdenacao - linhaB._trimestreOrdenacao;
+  });
+  preencherSelect("filtroTrimestre", trimestresUnicos);
+}
+
+function preencherSelect(idSelect, opcoes){
+  const select = document.getElementById(idSelect);
+  const selecionadosAntes = new Set(Array.from(select.selectedOptions).map(o => o.value));
+  select.innerHTML = "";
+  opcoes.forEach(opcao => {
+    const el = document.createElement("option");
+    el.value = opcao;
+    el.textContent = opcao;
+    if(selecionadosAntes.has(opcao)) el.selected = true;
+    select.appendChild(el);
+  });
+}
+
+function valoresSelecionados(idSelect){
+  return Array.from(document.getElementById(idSelect).selectedOptions).map(o => o.value);
+}
+
+function limparFiltros(){
+  ["filtroInstituto","filtroUnidade","filtroCategoria","filtroStatus","filtroMes","filtroTrimestre"].forEach(id => {
+    Array.from(document.getElementById(id).options).forEach(o => o.selected = false);
+  });
+  document.getElementById("buscaLivre").value = "";
+  aplicarFiltrosERenderizar();
+}
+
+// Aplica os filtros combinados (E entre dimensões, OU dentro da mesma dimensão) + busca livre
+function obterDadosFiltrados(){
+  const institutos = valoresSelecionados("filtroInstituto");
+  const unidades = valoresSelecionados("filtroUnidade");
+  const categorias = valoresSelecionados("filtroCategoria");
+  const statusList = valoresSelecionados("filtroStatus");
+  const meses = valoresSelecionados("filtroMes");
+  const trimestres = valoresSelecionados("filtroTrimestre");
+  const busca = document.getElementById("buscaLivre").value.trim().toLowerCase();
+
+  return dadosBrutos.filter(linha => {
+    if(institutos.length && !institutos.includes(linha["Instituto"])) return false;
+    if(unidades.length && !unidades.includes(linha["Unidade"])) return false;
+    if(categorias.length && !categorias.includes(linha["Categoria"])) return false;
+    if(statusList.length && !statusList.includes(linha["Status"])) return false;
+    if(meses.length && !meses.includes(linha["_mes"])) return false;
+    if(trimestres.length && !trimestres.includes(linha["_trimestre"])) return false;
+
+    if(busca){
+      const contemBusca = COLUNAS_TABELA.some(coluna =>
+        (linha[coluna] || "").toString().toLowerCase().includes(busca)
+      );
+      if(!contemBusca) return false;
+    }
+    return true;
+  });
+}
+
+/* =====================================================================
+   RENDERIZAÇÃO: cards, gráficos e tabela
+   ===================================================================== */
+function aplicarFiltrosERenderizar(){
+  const dados = obterDadosFiltrados();
+  renderizarCards(dados);
+  renderizarGraficos(dados);
+  renderizarTabela(dados);
+}
+
+function renderizarCards(dados){
+  const total = dados.length;
+  const respondidas = dados.filter(l => l.Status === "Respondido").length;
+  const atrasadas = dados.filter(l => l.Status === "Prazo vencido").length;
+  const pendentes = total - respondidas;
+
+  document.getElementById("cardTotal").textContent = total;
+  document.getElementById("cardRespondidas").textContent = respondidas;
+  document.getElementById("cardAtrasadas").textContent = atrasadas;
+  document.getElementById("cardPendentes").textContent = pendentes;
+}
+
+// Conta ocorrências por campo e devolve pares [rótulo, quantidade] ordenados do maior para o menor
+function contarPorCampo(dados, campo){
+  const contagem = {};
+  dados.forEach(linha => {
+    const valor = (linha[campo] || "Não informado").toString().trim() || "Não informado";
+    contagem[valor] = (contagem[valor] || 0) + 1;
+  });
+  return Object.entries(contagem).sort((a,b) => b[1] - a[1]);
+}
+
+// Plugin simples para exibir o valor no topo/lado de cada barra
+const pluginValoresNaBarra = {
+  id: "valoresNaBarra",
+  afterDatasetsDraw(chart){
+    const { ctx } = chart;
+    chart.data.datasets.forEach((dataset, indiceDataset) => {
+      const meta = chart.getDatasetMeta(indiceDataset);
+      meta.data.forEach((barra, indice) => {
+        const valor = dataset.data[indice];
+        ctx.save();
+        ctx.fillStyle = "#333";
+        ctx.font = "11px Segoe UI, Arial";
+        if(chart.options.indexAxis === "y"){
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(valor, barra.x + 4, barra.y);
+        } else {
+          ctx.textAlign = "center";
+          ctx.fillText(valor, barra.x, barra.y - 4);
+        }
+        ctx.restore();
+      });
+    });
+  }
+};
+
+function criarGraficoBarras(idCanvas, dados, campo, cor, horizontal){
+  const pares = contarPorCampo(dados, campo);
+  const rotulos = pares.map(p => p[0]);
+  const valores = pares.map(p => p[1]);
+
+  if(graficos[idCanvas]) graficos[idCanvas].destroy();
+
+  const ctx = document.getElementById(idCanvas).getContext("2d");
+  graficos[idCanvas] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: rotulos,
+      datasets: [{
+        data: valores,
+        backgroundColor: cor
+      }]
+    },
+    options: {
+      indexAxis: horizontal ? "y" : "x",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0 } },
+        y: { beginAtZero: true, ticks: { precision: 0 } }
+      }
+    },
+    plugins: [pluginValoresNaBarra]
+  });
+}
+
+function criarGraficoStatus(idCanvas, dados){
+  const pares = contarPorCampo(dados, "Status");
+  const rotulos = pares.map(p => p[0]);
+  const valores = pares.map(p => p[1]);
+  const cores = rotulos.map(rotulo => CORES_STATUS[rotulo] || "#999999");
+
+  if(graficos[idCanvas]) graficos[idCanvas].destroy();
+
+  const ctx = document.getElementById(idCanvas).getContext("2d");
+  graficos[idCanvas] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: rotulos,
+      datasets: [{ data: valores, backgroundColor: cores }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { precision: 0 } },
+        y: { beginAtZero: true, ticks: { precision: 0 } }
+      }
+    },
+    plugins: [pluginValoresNaBarra]
+  });
+}
+
+function renderizarGraficos(dados){
+  criarGraficoBarras("graficoInstituto", dados, "Instituto", "#1F7A4D", false);
+  criarGraficoBarras("graficoCategoria", dados, "Categoria", "#C0504D", true);
+  criarGraficoBarras("graficoUnidade", dados, "Unidade", "#4F81BD", true);
+  criarGraficoStatus("graficoStatus", dados);
+}
+
+/* =====================================================================
+   TABELA DETALHADA (ordenável, com busca já aplicada no filtro)
+   ===================================================================== */
+function montarCabecalhoTabela(){
+  const linhaCabecalho = document.getElementById("linhaCabecalhoTabela");
+  linhaCabecalho.innerHTML = "";
+  COLUNAS_TABELA.forEach(coluna => {
+    const th = document.createElement("th");
+    th.textContent = coluna;
+    th.addEventListener("click", () => {
+      if(ordenacaoAtual.coluna === coluna){
+        ordenacaoAtual.crescente = !ordenacaoAtual.crescente;
+      } else {
+        ordenacaoAtual = { coluna, crescente: true };
+      }
+      aplicarFiltrosERenderizar();
+    });
+    linhaCabecalho.appendChild(th);
+  });
+}
+montarCabecalhoTabela();
+
+function renderizarTabela(dados){
+  let linhas = dados.slice();
+
+  if(ordenacaoAtual.coluna){
+    const { coluna, crescente } = ordenacaoAtual;
+    linhas.sort((a,b) => {
+      const valorA = (a[coluna] || "").toString();
+      const valorB = (b[coluna] || "").toString();
+      return crescente
+        ? valorA.localeCompare(valorB, "pt-BR", { numeric: true })
+        : valorB.localeCompare(valorA, "pt-BR", { numeric: true });
+    });
+  }
+
+  const corpo = document.getElementById("corpoTabela");
+  corpo.innerHTML = "";
+
+  linhas.forEach(linha => {
+    const tr = document.createElement("tr");
+    COLUNAS_TABELA.forEach(coluna => {
+      const td = document.createElement("td");
+      if(coluna === "Status"){
+        const selo = document.createElement("span");
+        selo.className = "selo-status";
+        selo.style.background = CORES_STATUS[linha.Status] || "#999999";
+        selo.textContent = linha.Status;
+        td.appendChild(selo);
+      } else {
+        td.textContent = linha[coluna] || "";
+      }
+      tr.appendChild(td);
+    });
+    corpo.appendChild(tr);
+  });
+
+  document.getElementById("contadorLinhas").textContent = `${linhas.length} registro(s)`;
+}
+
+/* =====================================================================
+   EXPORTAÇÃO CSV DOS DADOS FILTRADOS
+   ===================================================================== */
+function exportarCsv(){
+  const dados = obterDadosFiltrados();
+  const linhasCsv = [COLUNAS_TABELA.join(";")];
+
+  dados.forEach(linha => {
+    const valores = COLUNAS_TABELA.map(coluna => {
+      const valor = (linha[coluna] || "").toString().replace(/"/g, '""');
+      return valor.includes(";") || valor.includes('"') ? `"${valor}"` : valor;
+    });
+    linhasCsv.push(valores.join(";"));
+  });
+
+  const conteudo = "﻿" + linhasCsv.join("\n"); // BOM para acentuação correta no Excel
+  const blob = new Blob([conteudo], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `painel-ouvidorias-${formatarDataIso(new Date())}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
