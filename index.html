@@ -126,9 +126,10 @@
   #filtroUnidade{
     min-height:128px;
   }
-  #btnLimparFiltros{
+  .botao-limpar-filtro{
     width:100%;
     background:var(--vermelho);
+    margin-bottom:16px;
   }
 
   main{
@@ -274,19 +275,6 @@
     margin-top:2px;
   }
 
-  @media (max-width:900px){
-    .layout{flex-direction:column;}
-    aside.filtros{
-      width:100%;
-      min-width:0;
-      height:auto;
-      position:relative;
-      border-right:none;
-      border-bottom:1px solid var(--borda);
-    }
-    .cards{grid-template-columns:1fr 1fr;}
-    .graficos{grid-template-columns:1fr;}
-  }
 </style>
 </head>
 <body>
@@ -319,6 +307,8 @@
   <aside class="filtros">
     <h2>Filtros</h2>
 
+    <button id="btnLimparFiltrosTopo" class="botao-limpar-filtro">Limpar filtros</button>
+
     <div class="grupo-filtro">
       <label class="titulo-filtro">Instituto</label>
       <select multiple id="filtroInstituto"></select>
@@ -349,7 +339,7 @@
       <select multiple id="filtroTrimestre"></select>
     </div>
 
-    <button id="btnLimparFiltros">Limpar filtros</button>
+    <button id="btnLimparFiltros" class="botao-limpar-filtro">Limpar filtros</button>
   </aside>
 
   <main>
@@ -453,6 +443,7 @@ const elHoraAtualizacao = document.getElementById("horaAtualizacao");
 document.getElementById("btnAtualizar").addEventListener("click", carregarDados);
 document.getElementById("btnTentarNovamente").addEventListener("click", carregarDados);
 document.getElementById("btnLimparFiltros").addEventListener("click", limparFiltros);
+document.getElementById("btnLimparFiltrosTopo").addEventListener("click", limparFiltros);
 document.getElementById("btnExportarCsv").addEventListener("click", exportarCsv);
 document.getElementById("buscaLivre").addEventListener("input", aplicarFiltrosERenderizar);
 
@@ -745,10 +736,18 @@ const pluginValoresNaBarra = {
   }
 };
 
+// Calcula uma folga de ~15% acima da maior barra, para o rótulo do valor não ficar cortado
+function calcularEscalaMaxima(valores){
+  const maiorValor = Math.max(0, ...valores);
+  if(maiorValor === 0) return 1;
+  return Math.ceil(maiorValor * 1.15);
+}
+
 function criarGraficoBarras(idCanvas, dados, campo, cor, horizontal){
   const pares = contarPorCampo(dados, campo);
   const rotulos = pares.map(p => p[0]);
   const valores = pares.map(p => p[1]);
+  const escalaMaxima = calcularEscalaMaxima(valores);
 
   if(graficos[idCanvas]) graficos[idCanvas].destroy();
 
@@ -768,8 +767,8 @@ function criarGraficoBarras(idCanvas, dados, campo, cor, horizontal){
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { beginAtZero: true, ticks: { precision: 0 } },
-        y: { beginAtZero: true, ticks: { precision: 0 } }
+        x: { beginAtZero: true, suggestedMax: horizontal ? escalaMaxima : undefined, ticks: { precision: 0 } },
+        y: { beginAtZero: true, suggestedMax: horizontal ? undefined : escalaMaxima, ticks: { precision: 0 } }
       }
     },
     plugins: [pluginValoresNaBarra]
@@ -781,6 +780,7 @@ function criarGraficoStatus(idCanvas, dados){
   const rotulos = pares.map(p => p[0]);
   const valores = pares.map(p => p[1]);
   const cores = rotulos.map(rotulo => CORES_STATUS[rotulo] || "#999999");
+  const escalaMaxima = calcularEscalaMaxima(valores);
 
   if(graficos[idCanvas]) graficos[idCanvas].destroy();
 
@@ -797,7 +797,7 @@ function criarGraficoStatus(idCanvas, dados){
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { precision: 0 } },
-        y: { beginAtZero: true, ticks: { precision: 0 } }
+        y: { beginAtZero: true, suggestedMax: escalaMaxima, ticks: { precision: 0 } }
       }
     },
     plugins: [pluginValoresNaBarra]
